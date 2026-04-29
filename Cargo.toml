@@ -3,6 +3,12 @@ name = "anima-linux"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# System tray via libappindicator (requires libappindicator-gtk3 at runtime).
+# Enabled by default; build with --no-default-features to disable.
+default = ["tray"]
+tray = ["dep:libappindicator"]
+
 [dependencies]
 gtk = "0.18"
 gdk = "0.18"
@@ -13,6 +19,7 @@ directories = "6.0.0"
 dirs = "5"
 image = { version = "0.25.10", features = ["gif"] }
 sha2 = "0.11.0"
+libappindicator = { version = "0.9", optional = true }
 
 [profile.release]
 opt-level = 3

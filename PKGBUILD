@@ -21,6 +21,7 @@ makedepends=(
     'git'
 )
 optdepends=(
+    'libappindicator-gtk3: system tray support (minimize to tray instead of closing)'
     'xorg-xwayland: recommended for taskbar hiding on Wayland sessions'
 )
 source=("$pkgname::git+$url.git#tag=v$pkgver")

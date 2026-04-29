@@ -26,7 +26,7 @@ fn load_app_icon() -> Option<Pixbuf> {
 pub fn build_ui(app: &Application) {
     println!("Building UI...");
     let db = Db::new().expect("Failed to init DB");
-    
+
     let state = Rc::new(RefCell::new(AppState {
         db,
         animas: Vec::new(),
@@ -55,7 +55,7 @@ pub fn build_ui(app: &Application) {
     };
 
     let main_vbox = GtkBox::new(Orientation::Vertical, 0);
-    
+
     let toolbar = toolbar::build(&ctx);
     main_vbox.pack_start(&toolbar, false, false, 0);
     main_vbox.pack_start(&Separator::new(Orientation::Horizontal), false, false, 0);
@@ -67,13 +67,13 @@ pub fn build_ui(app: &Application) {
     left_vbox.set_margin(5);
 
     let notebook = Notebook::new();
-    
+
     let library_list = ListBox::new();
     library_list.set_activate_on_single_click(true);
     let library_scroll = ScrolledWindow::new(None::<&Adjustment>, None::<&Adjustment>);
     library_scroll.add(&library_list);
     library::build(&ctx, &library_list);
-    
+
     let active_spawns_list = ListBox::new();
     active_spawns_list.set_activate_on_single_click(true);
     let spawns_scroll = ScrolledWindow::new(None::<&Adjustment>, None::<&Adjustment>);
@@ -86,7 +86,7 @@ pub fn build_ui(app: &Application) {
     notebook.append_page(&settings_scroll, Some(&Label::new(Some("Settings"))));
 
     left_vbox.pack_start(&notebook, true, true, 0);
-    
+
     let opacity_box = GtkBox::new(Orientation::Vertical, 2);
     opacity_box.set_margin(5);
     opacity_box.add(&Label::new(Some("Global Temp Opacity")));
@@ -129,7 +129,7 @@ pub fn build_ui(app: &Application) {
         let max = s.db.get_max_spawns().unwrap_or(10) as usize;
         let instances = s.db.get_all_instances().unwrap_or_default();
         let anims = s.db.get_all_animations().unwrap_or_default();
-        
+
         let mut to_spawn = Vec::new();
         let mut count = 0;
         for inst in instances.iter().filter(|a| a.auto_spawn) {
@@ -154,7 +154,7 @@ pub fn build_ui(app: &Application) {
                 args.8, args.9, args.10, args.11, args.12, args.13, args.14, args.15, args.16, args.17
             );
             let ctx_clone = ctx.clone();
-            crate::ui::state::register_anima_window(&ctx_clone, anima);
+            state::register_anima_window(&ctx_clone, anima);
         }
     }
     if let Some(f) = ctx.refresh_active_spawns.borrow().as_ref() { f(); }
@@ -170,5 +170,94 @@ pub fn build_ui(app: &Application) {
         gtk::glib::ControlFlow::Continue
     });
 
+    // When the "tray" feature is compiled in, clicking X hides the window and
+    // the app lives in the system tray. Without the feature the window closes
+    // normally (default GTK behaviour).
+    #[cfg(feature = "tray")]
+    setup_tray(app, &window);
+
     window.show_all();
+}
+
+// Everything below is only compiled when the "tray" Cargo feature is enabled.
+
+/// Write the embedded icon PNG to a temp directory so libappindicator can
+/// reference it by filesystem path (the C library does not accept raw bytes).
+#[cfg(feature = "tray")]
+fn write_tray_icon() -> Option<std::path::PathBuf> {
+    let tmp = std::env::temp_dir().join("anima-linux-tray");
+    std::fs::create_dir_all(&tmp).ok()?;
+    let icon_path = tmp.join("anima-linux.png");
+    std::fs::write(&icon_path, APP_ICON_BYTES).ok()?;
+    Some(icon_path)
+}
+
+/// Set up the system tray indicator and intercept the window close button.
+///
+/// Called only when the `tray` feature is enabled. If libappindicator fails
+/// to initialise (e.g. no status-notifier host running), the function still
+/// hooks the delete-event so the window hides.
+#[cfg(feature = "tray")]
+fn setup_tray(app: &Application, window: &ApplicationWindow) {
+    // Keep the GtkApplication alive even when every window is hidden.
+    // ApplicationExtManual::hold() is in scope via gtk::prelude::*.
+    // Leak the guard so it is never dropped, the app stays alive until quit().
+    std::mem::forget(app.hold());
+
+    let tray_menu = gtk::Menu::new();
+
+    let show_item = gtk::MenuItem::with_label("Show / Hide");
+    let quit_item = gtk::MenuItem::with_label("Quit Anima");
+
+    tray_menu.append(&show_item);
+    tray_menu.append(&gtk::SeparatorMenuItem::new());
+    tray_menu.append(&quit_item);
+    tray_menu.show_all();
+
+    // AppIndicator
+    let mut indicator = if let Some(icon_path) = write_tray_icon() {
+        let theme_dir = icon_path
+            .parent()
+            .unwrap_or(std::path::Path::new("/tmp"))
+            .to_string_lossy()
+            .to_string();
+        let icon_name = icon_path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        libappindicator::AppIndicator::with_path("anima-linux", &icon_name, &theme_dir)
+    } else {
+        libappindicator::AppIndicator::new("anima-linux", "application-x-executable")
+    };
+
+    indicator.set_status(libappindicator::AppIndicatorStatus::Active);
+    indicator.set_title("Anima");
+    indicator.set_menu(&mut tray_menu.clone());
+
+    // The indicator must live for the entire process lifetime.
+    std::mem::forget(indicator);
+
+    // Show / Hide toggle
+    let win_toggle = window.clone();
+    show_item.connect_activate(move |_| {
+        if win_toggle.is_visible() {
+            win_toggle.hide();
+        } else {
+            win_toggle.show_all();
+            win_toggle.present();
+        }
+    });
+
+    // Quit
+    let app_quit = app.clone();
+    quit_item.connect_activate(move |_| {
+        <gtk::Application as gio::prelude::ApplicationExt>::quit(&app_quit);
+    });
+
+    // Intercept the window X button to hide instead of destroy
+    window.connect_delete_event(move |win, _| {
+        win.hide();
+        gtk::glib::Propagation::Stop
+    });
 }

@@ -11,19 +11,34 @@ Anima-Linux is a powerful, highly-customizable desktop mascot application for Li
 - **Real-Time Live Updates**: Fine-tune your mascot's scale, opacity, contrast, brightness, saturation, hue, and color temperature via the control panel with instant visual feedback.
 - **Automated Spawning**: Set your favorite mascots to auto-spawn when the application starts.
 - **Persistent Positions**: Mascot positions are automatically saved, so they stay exactly where you leave them.
+- **System Tray**: When `libappindicator-gtk3` is installed, closing the window minimizes Anima to the system tray instead of quitting. Right-click the tray icon to show/hide the window or quit the application.
 
 ## Installation & Running
 
-Ensure you have Rust and Cargo installed, as well as the GTK3 development libraries (`libgtk-3-dev` on Debian/Ubuntu, `gtk3-devel` on Fedora, etc.).
+Ensure you have Rust and Cargo installed, as well as the GTK3 development libraries (`libgtk-3-dev` on Debian/Ubuntu, `gtk3` on Arch, etc.).
 
 ```bash
 # Clone the repository
 git clone https://github.com/zylquinal/anima-linux.git
 cd anima-linux
 
-# Run the application
+# Run the application (system tray enabled by default)
 cargo run --release
+
+# Run without system tray support
+cargo run --release --no-default-features
 ```
+
+## System Tray
+
+The tray feature is enabled by default and requires `libappindicator-gtk3` (Arch: `libappindicator-gtk3`, Debian/Ubuntu: `libappindicator3-dev`) at both build and runtime.
+
+| Behaviour | How to build |
+|-----------|-------------|
+| Tray enabled — X hides to tray, quit from menu | `cargo build --release` *(default)* |
+| Tray disabled — X closes normally | `cargo build --release --no-default-features` |
+
+> **GNOME note**: Standard GNOME Shell does not display AppIndicator tray icons by default. Install the [AppIndicator and KStatusNotifierItem Support](https://extensions.gnome.org/extension/615/appindicator-support/) extension to enable them. KDE Plasma, XFCE, and most other desktop environments work out of the box.
 
 ## Configuration
 
