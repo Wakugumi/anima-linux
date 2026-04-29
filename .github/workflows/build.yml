@@ -28,6 +28,7 @@ jobs:
             libgdk-pixbuf-2.0-dev \
             libglib2.0-dev \
             libcairo2-dev \
+            libsqlite3-dev \
             pkg-config \
             build-essential
 

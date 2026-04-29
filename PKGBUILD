@@ -12,6 +12,7 @@ depends=(
     'glib2'
     'cairo'
     'gsettings-desktop-schemas'
+    'sqlite'
 )
 makedepends=(
     'rust'
