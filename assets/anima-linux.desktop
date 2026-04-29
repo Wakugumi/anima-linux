@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Anima
+GenericName=Desktop Mascot Manager
+Comment=Spawn and manage animated desktop mascots on Linux
+Exec=anima-linux
+Icon=anima-linux
+Terminal=false
+Categories=Utility;Graphics;
+Keywords=mascot;desktop;animation;gif;
+StartupWMClass=anima-linux
+StartupNotify=true

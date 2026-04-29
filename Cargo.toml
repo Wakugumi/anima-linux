@@ -1,0 +1,21 @@
+[package]
+name = "anima-linux"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+gtk = "0.18"
+gdk = "0.18"
+gdk-pixbuf = "0.18"
+gio = "0.18"
+rusqlite = { version = "0.39.0", features = ["bundled"] }
+directories = "6.0.0"
+dirs = "5"
+image = { version = "0.25.10", features = ["gif"] }
+sha2 = "0.11.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
