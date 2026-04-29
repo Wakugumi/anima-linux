@@ -75,21 +75,35 @@ pub fn build(ctx: &AppContext, active_spawns_list: &ListBox, control_panel: &Gtk
                 let spawn_btn = Button::with_label("Spawn");
                 let state_spawn = state.clone();
                 let ref_a = refresh_inner.clone();
-                let path_c = anim.file_path.clone();
-                let name_c = anim.name.clone();
-                let inst_c = inst.clone();
                 let ctx_clone = ctx_outer.clone();
                 spawn_btn.connect_clicked(move |_| {
+                    let (inst_data, anim_path, anim_name) = {
+                        let st = state_spawn.borrow();
+                        let insts = st.db.get_all_instances().unwrap_or_default();
+                        let anims = st.db.get_all_animations().unwrap_or_default();
+                        let inst = match insts.into_iter().find(|i| i.id == db_id) {
+                            Some(i) => i,
+                            None => return, // instance was deleted
+                        };
+                        let anim = match anims.into_iter().find(|a| a.id == inst.animation_id) {
+                            Some(a) => a,
+                            None => return,
+                        };
+                        (inst, anim.file_path, anim.name)
+                    };
                     let (counter, g_opacity) = {
                         let mut st = state_spawn.borrow_mut();
                         st.instance_counter += 1;
                         (st.instance_counter, st.global_opacity)
                     };
                     let anima = AnimaWindow::new(
-                        counter, db_id, name_c.clone(), &path_c,
-                        inst_c.scale, inst_c.opacity * g_opacity, inst_c.x, inst_c.y,
-                        inst_c.mirror, inst_c.flip_v, inst_c.roll, inst_c.pitch, inst_c.yaw,
-                        inst_c.temperature, inst_c.contrast, inst_c.brightness, inst_c.saturation, inst_c.hue
+                        counter, db_id, anim_name, &anim_path,
+                        inst_data.scale, inst_data.opacity * g_opacity,
+                        inst_data.x, inst_data.y,
+                        inst_data.mirror, inst_data.flip_v,
+                        inst_data.roll, inst_data.pitch, inst_data.yaw,
+                        inst_data.temperature, inst_data.contrast,
+                        inst_data.brightness, inst_data.saturation, inst_data.hue
                     );
                     let ctx_clone = ctx_clone.clone();
                     crate::ui::state::register_anima_window(&ctx_clone, anima);
@@ -97,6 +111,7 @@ pub fn build(ctx: &AppContext, active_spawns_list: &ListBox, control_panel: &Gtk
                 });
                 btn_box.pack_start(&spawn_btn, false, false, 0);
             }
+
 
             let del_btn = Button::with_label("Delete");
             let state_del = state.clone();

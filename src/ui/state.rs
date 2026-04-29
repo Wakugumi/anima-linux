@@ -42,11 +42,11 @@ pub fn register_anima_window(ctx: &AppContext, anima: AnimaWindow) {
     let w = anima.window.clone();
     let st_c = ctx.state.clone();
     let ref_a_c = ctx.refresh_active_spawns.clone();
-    let db_id_c = anima.instance_db_id;
-    
+    let spawn_id = anima.id;
+
     w.connect_destroy(move |_| {
         if let Ok(mut s) = st_c.try_borrow_mut() {
-            if let Some(idx) = s.animas.iter().position(|x| x.instance_db_id == db_id_c) {
+            if let Some(idx) = s.animas.iter().position(|x| x.id == spawn_id) {
                 s.animas.remove(idx);
                 drop(s);
                 if let Ok(f_ref) = ref_a_c.try_borrow() {
@@ -55,6 +55,6 @@ pub fn register_anima_window(ctx: &AppContext, anima: AnimaWindow) {
             }
         }
     });
-    
+
     ctx.state.borrow_mut().animas.push(anima);
 }

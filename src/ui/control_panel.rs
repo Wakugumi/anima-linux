@@ -12,7 +12,7 @@ pub fn build(ctx: &AppContext, right_scroll: &ScrolledWindow, control_panel: &Gt
     let state = ctx.state.clone();
     let refresh_active_spawns = ctx.refresh_active_spawns.clone();
     let current_edit_target = ctx.current_edit_target.clone();
-    
+
     let ctx_c = ctx.clone();
     *ctx.update_control_panel.borrow_mut() = Some(Rc::new(move |target| {
         println!("Opening control panel for target...");
@@ -25,9 +25,9 @@ pub fn build(ctx: &AppContext, right_scroll: &ScrolledWindow, control_panel: &Gt
                 let anims = s.db.get_all_animations().unwrap_or_default();
                 let a = anims.into_iter().find(|x| x.id == id).expect("Anim not found");
                 (a.name, a.file_path, crate::db::InstanceConfig {
-                    id: -1, animation_id: id, scale: 1.0, opacity: 1.0, x: 0, y: 0, 
-                    auto_spawn: false, mirror: false, flip_v: false, roll: 0.0, pitch: 0.0, yaw: 0.0, temperature: 0.0, contrast: 0.0, 
-                    brightness: 0.0, saturation: 0.0, hue: 0.0 
+                    id: -1, animation_id: id, scale: 1.0, opacity: 1.0, x: 0, y: 0,
+                    auto_spawn: false, mirror: false, flip_v: false, roll: 0.0, pitch: 0.0, yaw: 0.0, temperature: 0.0, contrast: 0.0,
+                    brightness: 0.0, saturation: 0.0, hue: 0.0
                 })
             }
             EditTarget::Instance(id) => {
@@ -48,26 +48,26 @@ pub fn build(ctx: &AppContext, right_scroll: &ScrolledWindow, control_panel: &Gt
 
         let preview_img = Image::new();
         preview_img.set_size_request(200, 200);
-        
+
         let info_label = Label::new(None);
         info_label.set_markup("<span size='small' color='gray'>Preview limited to 1.0x to save space. Actual spawn will be larger.</span>");
         info_label.set_no_show_all(true);
-        
+
         let preview_path_orig = file_path.clone();
-        
+
         let update_preview = {
             let preview_img = preview_img.clone();
             let preview_path_orig = preview_path_orig.clone();
             let info_label = info_label.clone();
             move |scale: f64, mirror: bool, flip_v: bool, roll: f64, pitch: f64, yaw: f64, temp: f64, contrast: f64, bright: f64, sat: f64, hue: f64| {
                 println!("Rendering preview...");
-                
+
                 if scale > 1.0 {
                     info_label.show();
                 } else {
                     info_label.hide();
                 }
-                
+
                 let preview_scale = scale.min(1.0);
                 let unchanged = (preview_scale - 1.0).abs() < 0.01 && !mirror && !flip_v && roll.abs() < 0.01 && pitch.abs() < 0.01 && yaw.abs() < 0.01 && temp.abs() < 0.01 && contrast.abs() < 0.01 && bright.abs() < 0.01 && sat.abs() < 0.01 && hue.abs() < 0.01;
 
@@ -83,13 +83,13 @@ pub fn build(ctx: &AppContext, right_scroll: &ScrolledWindow, control_panel: &Gt
                     let data = crate::anima_resize::process_gif_in_memory(
                         &preview_path_orig, preview_scale, mirror, flip_v, roll, pitch, yaw, temp, contrast, bright, sat, hue
                     );
-                    
+
                     let loader = gdk_pixbuf::PixbufLoader::with_type("gif").unwrap();
                     if let Err(e) = loader.write(&data) {
                         eprintln!("Failed to write to PixbufLoader: {}", e);
                     }
                     let _ = loader.close();
-                    
+
                     if let Some(anim) = loader.animation() {
                         preview_img.set_from_animation(&anim);
                         preview_img.show();
@@ -167,7 +167,7 @@ pub fn build(ctx: &AppContext, right_scroll: &ScrolledWindow, control_panel: &Gt
 
         let live_update_enabled = state.borrow().db.get_live_update_enabled().unwrap_or(true);
         let live_update_delay = state.borrow().db.get_live_update_delay().unwrap_or(300);
-        
+
         let debounce_id = Rc::new(RefCell::new(None::<gtk::glib::SourceId>));
         let live_update = {
             let up_p = update_preview.clone();
@@ -205,7 +205,7 @@ pub fn build(ctx: &AppContext, right_scroll: &ScrolledWindow, control_panel: &Gt
         b_adj.connect_value_changed({let lu = live_update.clone(); move |_| lu()});
         s_adj.connect_value_changed({let lu = live_update.clone(); move |_| lu()});
         h_adj.connect_value_changed({let lu = live_update.clone(); move |_| lu()});
-        
+
         update_preview(config.scale, config.mirror, config.flip_v, config.roll, config.pitch, config.yaw, config.temperature, config.contrast, config.brightness, config.saturation, config.hue);
 
         let action_box = GtkBox::new(Orientation::Horizontal, 10);
@@ -219,60 +219,82 @@ pub fn build(ctx: &AppContext, right_scroll: &ScrolledWindow, control_panel: &Gt
 
         let state_c = state.clone();
         let refresh_a = refresh_active_spawns.clone();
-        let target_c = target.clone();
         let name_c = name.clone();
         let path_c = file_path.clone();
 
+        let effective_target: Rc<RefCell<EditTarget>> = Rc::new(RefCell::new(target.clone()));
+        let title_lbl = title.clone();
+
         let ctx_c2 = ctx_c.clone();
-        let on_apply = move || {
-            let mirror = mirror_check.is_active();
-            let flip_v = flip_v_check.is_active();
-            let roll = r_adj.value();
-            let pitch = p_adj.value();
-            let yaw = y_adj.value();
-            let scale = sl_adj.value();
-            let opacity = op_adj.value();
-            let temp = t_adj.value();
-            let cont = c_adj.value();
-            let bright = b_adj.value();
-            let sat = s_adj.value();
-            let hue = h_adj.value();
-            let auto = auto_spawn_check.is_active();
+        let on_apply = {
+            let effective_target = effective_target.clone();
+            move || {
+                let mirror = mirror_check.is_active();
+                let flip_v = flip_v_check.is_active();
+                let roll = r_adj.value();
+                let pitch = p_adj.value();
+                let yaw = y_adj.value();
+                let scale = sl_adj.value();
+                let opacity = op_adj.value();
+                let temp = t_adj.value();
+                let cont = c_adj.value();
+                let bright = b_adj.value();
+                let sat = s_adj.value();
+                let hue = h_adj.value();
+                let auto = auto_spawn_check.is_active();
 
-            let mut st = state_c.borrow_mut();
-            let db_id = match target_c {
-                EditTarget::Instance(id) => id,
-                EditTarget::Library(anim_id) => st.db.insert_instance(anim_id, scale, opacity, 0, 0, auto).unwrap(),
-            };
-            
-            let _ = st.db.update_instance_scale(db_id, scale);
-            let _ = st.db.update_instance_auto_spawn(db_id, auto);
-            let _ = st.db.update_instance_mirror(db_id, mirror);
-            let _ = st.db.update_instance_rotation(db_id, flip_v, roll, pitch, yaw);
-            let _ = st.db.update_instance_editing(db_id, temp, cont, bright, sat, hue);
-            let _ = st.db.update_instance_opacity(db_id, opacity);
+                let mut st = state_c.borrow_mut();
 
-            if let Some(idx) = st.animas.iter().position(|a| a.instance_db_id == db_id) {
-                let win = st.animas[idx].window.clone();
-                st.animas.remove(idx);
+                let db_id = match *effective_target.borrow() {
+                    EditTarget::Instance(id) => id,
+                    EditTarget::Library(anim_id) => {
+                        let id = st.db.insert_instance(anim_id, scale, opacity, 0, 0, auto).unwrap();
+                        // Promote to Instance so subsequent applies update, not insert.
+                        *effective_target.borrow_mut() = EditTarget::Instance(id);
+                        title_lbl.set_markup(&format!(
+                            "<span size='large' weight='bold'>Active Instance - {}</span>",
+                            name_c
+                        ));
+                        id
+                    }
+                };
+
+                let _ = st.db.update_instance_scale(db_id, scale);
+                let _ = st.db.update_instance_auto_spawn(db_id, auto);
+                let _ = st.db.update_instance_mirror(db_id, mirror);
+                let _ = st.db.update_instance_rotation(db_id, flip_v, roll, pitch, yaw);
+                let _ = st.db.update_instance_editing(db_id, temp, cont, bright, sat, hue);
+                let _ = st.db.update_instance_opacity(db_id, opacity);
+
+                let mut spawn_x = 0i32;
+                let mut spawn_y = 0i32;
+                if let Some(idx) = st.animas.iter().position(|a| a.instance_db_id == db_id) {
+                    let (cx, cy) = st.animas[idx].position();
+                    spawn_x = cx;
+                    spawn_y = cy;
+                    let win = st.animas[idx].window.clone();
+                    st.animas.remove(idx);
+                    drop(st);
+                    win.close();
+                    st = state_c.borrow_mut();
+                }
+
+                let _ = st.db.update_instance_position(db_id, spawn_x, spawn_y);
+
+                let (counter, g_opacity) = {
+                    st.instance_counter += 1;
+                    (st.instance_counter, st.global_opacity)
+                };
                 drop(st);
-                win.close();
-                st = state_c.borrow_mut();
+
+                let anima = AnimaWindow::new(
+                    counter, db_id, name_c.clone(), &path_c,
+                    scale, opacity * g_opacity, spawn_x, spawn_y,
+                    mirror, flip_v, roll, pitch, yaw, temp, cont, bright, sat, hue
+                );
+                crate::ui::state::register_anima_window(&ctx_c2, anima);
+                if let Some(f) = refresh_a.borrow().as_ref() { f(); }
             }
-            
-            let (counter, g_opacity) = {
-                st.instance_counter += 1;
-                (st.instance_counter, st.global_opacity)
-            };
-            drop(st);
-            
-            let anima = AnimaWindow::new(
-                counter, db_id, name_c.clone(), &path_c,
-                scale, opacity * g_opacity, 0, 0,
-                mirror, flip_v, roll, pitch, yaw, temp, cont, bright, sat, hue
-            );
-            crate::ui::state::register_anima_window(&ctx_c2, anima);
-            if let Some(f) = refresh_a.borrow().as_ref() { f(); }
         };
 
         let on_apply_rc = Rc::new(on_apply);
